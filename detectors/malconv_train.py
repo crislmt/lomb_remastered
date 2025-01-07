@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from tensorflow.keras.layers import Input, Embedding, Multiply, Conv1D, GlobalMaxPool1D, Dense
 from tensorflow.keras.models import Model
+from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.data import AUTOTUNE
@@ -39,7 +40,7 @@ def make_malconv():
     return malconv
 
 # Train the model
-def train_malconv(training_dir, validation_dir, output_dir, epochs=10, batch_size = 32, resume_training = False, restart_from = 0, poisoned_directory=None, poisoned_training=False):
+def train_malconv(training_dir, validation_dir, output_dir, epochs=10, batch_size = 32, restart_model = None, restart_training = False, restart_from = 0, poisoned_directory=None, poisoned_training=False):
     
     training_dataset = create_dataset(training_dir, MALCONV_MAX_INPUT_LENGTH)
     validation_dataset = create_dataset(validation_dir, MALCONV_MAX_INPUT_LENGTH)
@@ -49,7 +50,8 @@ def train_malconv(training_dir, validation_dir, output_dir, epochs=10, batch_siz
 
     model = make_malconv()
 
-    if(resume_training):
+    if(restart_training):
+        model = load_model(restart_model)
         model.fit(training_dataset, validation_data=validation_dataset, epochs=epochs, initial_epoch = restart_from, batch_size=batch_size, callbacks = [EarlyStopping(patience=3, min_delta = 0.001), CustomCheckpointCallback()])
     else:
         model.fit(training_dataset, validation_data=validation_dataset, epochs=epochs, batch_size=batch_size, callbacks = [EarlyStopping(patience=3, min_delta = 0.001), CustomCheckpointCallback()])
@@ -71,12 +73,17 @@ class CustomCheckpointCallback(tf.keras.callbacks.Callback):
 
 
 if __name__ == '__main__':
-    dataset = r"d:\dataset"
+    dataset = r"dataset"
     training_dir = os.path.join(dataset, "training")
     validation_dir = os.path.join(dataset, "validation")
     test_dir = os.path.join(dataset, "test")
-    output_dir = r"d:\output"
-    train_malconv(training_dir, validation_dir, output_dir)
+    output_dir = r"output"
+
+    restart_training = True
+    restart_model = "/home/chris/lomb_remastered/detectors/trained_detectors/malconv-2.keras"
+    restart_from = 2
+
+    train_malconv(training_dir, validation_dir, output_dir, restart_training = restart_training, restart_model = restart_model, restart_from = restart_from)
 
 
 
