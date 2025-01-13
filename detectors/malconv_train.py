@@ -21,19 +21,20 @@ SEED = 42
 # Define and compile the model
 def make_malconv():
     
-    input = Input(shape=(MALCONV_MAX_INPUT_LENGTH,))
-    embedding = Embedding(VOCABULARY_SIZE, 8)(input)
-    conv1 = Conv1D(FILTER_NUMBER, FILTER_WIDTH, strides=STRIDES, padding = 'same')(embedding)
-    conv2 = Conv1D(FILTER_NUMBER, FILTER_WIDTH, strides=STRIDES, padding = 'same', activation = 'sigmoid')(embedding)
-    multiply = Multiply()([conv1, conv2])
-    max_pooling = GlobalMaxPool1D()(multiply)
-    dense = Dense(128, activation='relu')(max_pooling)
-    output = Dense(1, activation='sigmoid')(dense)
+    input_layer = Input(shape=(MALCONV_MAX_INPUT_LENGTH,))
+    embedding_layer = Embedding(input_dim = VOCABULARY_SIZE, output_dim=8, mask_zero = True)(input_layer)
+    #TODO relu in the first conv layer
+    conv1_layer = Conv1D(filters = FILTER_NUMBER, kernel_size = FILTER_WIDTH, strides=STRIDES)(embedding_layer)
+    conv2_layer = Conv1D(filters = FILTER_NUMBER, kernel_size = FILTER_WIDTH, strides=STRIDES, activation = 'sigmoid')(embedding_layer)
+    multiply_layer = Multiply()([conv1_layer, conv2_layer])
+    max_pooling_layer = GlobalMaxPool1D()(multiply_layer)
+    dense_layer = Dense(128, activation='relu')(max_pooling_layer)
+    output_layer = Dense(1, activation='sigmoid')(dense_layer)
     
-    optimizer = SGD(learning_rate=0.01, momentum=0.9, nesterov=True, decay=1e-3)
-    malconv = Model(inputs=input, outputs=output)
+    optimizer = SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
+    malconv = Model(inputs=input_layer, outputs=output_layer)
     
-    malconv.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy',
+    malconv.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(),
                                                                               tf.keras.metrics.Precision(),
                                                                               tf.keras.metrics.Recall(),
                                                                               tf.keras.metrics.AUC()])
