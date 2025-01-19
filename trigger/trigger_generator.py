@@ -1,9 +1,10 @@
 import numpy as np
 import random
+import os
 
 SAVE_PATH = r"C:\Users\Vincenzo\Thesis\project_backdooring\triggers"
 
-from detectors.malconv_utils import get_feature_extractor_only, get_predictor_only
+from detectors.malconv.malconv_utils import get_feature_extractor_only, get_predictor_only
 
 # Generate a trigger that contains both malware and goodware features
 # If fp_score is provided, the trigger is generated as that the injected poisoning binaries are likely to be classified as false positives
@@ -77,4 +78,3 @@ def save_trigger(trigger, n_feats, trigger_type, fp):
     np.save(os.path.join(SAVE_PATH, f"malconv_{trigger_type}_trigger_{n_feats}_fp_{fp}"), values)
 
 
-    

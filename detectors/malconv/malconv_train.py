@@ -9,22 +9,21 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.data import AUTOTUNE
 from datetime import datetime
 
-from detectors.dataset import create_dataset
+from detectors.malconv.dataset import create_dataset
 
 MALCONV_MAX_INPUT_LENGTH = 2000000
 FILTER_WIDTH = 500
 STRIDES = 500
 FILTER_NUMBER = 128
-VOCABULARY_SIZE = 256
+VOCABULARY_SIZE = 257
 SEED = 42
 
 # Define and compile the model
 def make_malconv():
     
-    input_layer = Input(shape=(MALCONV_MAX_INPUT_LENGTH,))
+    input_layer = Input(shape=(MALCONV_MAX_INPUT_LENGTH,), dtype=tf.int32)
     embedding_layer = Embedding(input_dim = VOCABULARY_SIZE, output_dim=8, mask_zero = True)(input_layer)
-    #TODO relu in the first conv layer
-    conv1_layer = Conv1D(filters = FILTER_NUMBER, kernel_size = FILTER_WIDTH, strides=STRIDES)(embedding_layer)
+    conv1_layer = Conv1D(filters = FILTER_NUMBER, kernel_size = FILTER_WIDTH, strides=STRIDES, activation = 'relu')(embedding_layer)
     conv2_layer = Conv1D(filters = FILTER_NUMBER, kernel_size = FILTER_WIDTH, strides=STRIDES, activation = 'sigmoid')(embedding_layer)
     multiply_layer = Multiply()([conv1_layer, conv2_layer])
     max_pooling_layer = GlobalMaxPool1D()(multiply_layer)
@@ -37,25 +36,22 @@ def make_malconv():
     malconv.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=[tf.keras.metrics.BinaryAccuracy(),
                                                                               tf.keras.metrics.Precision(),
                                                                               tf.keras.metrics.Recall(),
-                                                                              tf.keras.metrics.AUC()])
+                                                                              ])
     return malconv
 
 # Train the model
-def train_malconv(training_dir, validation_dir, output_dir, epochs=10, batch_size = 32, restart_model = None, restart_training = False, restart_from = 0, poisoned_directory=None, poisoned_training=False):
+def train_malconv(training_dir, validation_dir, output_dir, epochs=10, batch_size = 16, restart_model = None, restart_training = False, restart_from = 0, poisoned_directory=None, poisoned_training=False):
     
-    training_dataset = create_dataset(training_dir, MALCONV_MAX_INPUT_LENGTH)
-    validation_dataset = create_dataset(validation_dir, MALCONV_MAX_INPUT_LENGTH)
-    
-    training_dataset = training_dataset.shuffle(1000, seed = SEED).batch(batch_size).prefetch(AUTOTUNE)
-    validation_dataset = validation_dataset.shuffle(1000, seed = SEED).batch(batch_size).prefetch(AUTOTUNE)
-
+    training_dataset = create_dataset(training_dir, batch_size=batch_size)
+    validation_dataset = create_dataset(validation_dir, batch_size=batch_size)
+   
     model = make_malconv()
 
     if(restart_training):
         model = load_model(restart_model)
-        model.fit(training_dataset, validation_data=validation_dataset, epochs=epochs, initial_epoch = restart_from, batch_size=batch_size, callbacks = [EarlyStopping(patience=3, min_delta = 0.001), CustomCheckpointCallback()])
-    else:
-        model.fit(training_dataset, validation_data=validation_dataset, epochs=epochs, batch_size=batch_size, callbacks = [EarlyStopping(patience=3, min_delta = 0.001), CustomCheckpointCallback()])
+        
+    
+    model.fit(training_dataset, validation_data=validation_dataset, epochs=epochs, batch_size=batch_size, callbacks = [EarlyStopping(monitor = 'val_loss', patience=5, min_delta = 0.001), CustomCheckpointCallback()])
     model.save(os.path.join(output_dir, "malconv"))
 
 # Test the model
@@ -84,7 +80,7 @@ if __name__ == '__main__':
     restart_model = "/home/chris/lomb_remastered/detectors/trained_detectors/malconv-2.keras"
     restart_from = 2
 
-    train_malconv(training_dir, validation_dir, output_dir, restart_training = restart_training, restart_model = restart_model, restart_from = restart_from)
+    train_malconv(training_dir, validation_dir, output_dir)
 
 
 
